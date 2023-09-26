@@ -1,31 +1,41 @@
-import server from "./server";
+import server from './server';
+import { getWalletAddress } from './utils';
 
-function Wallet({ address, setAddress, balance, setBalance }) {
-  async function onChange(evt) {
-    const address = evt.target.value;
-    setAddress(address);
-    if (address) {
-      const {
-        data: { balance },
-      } = await server.get(`balance/${address}`);
-      setBalance(balance);
-    } else {
-      setBalance(0);
-    }
-  }
+function Wallet({ address, setAddress, balance, setBalance, privateKey, setPrivateKey }) {
+	async function onChange(evt) {
+		const privateKey = evt.target.value;
+		setPrivateKey(privateKey);
+		// don't set address until we have a valid private key
+		setAddress('');
+		const address = getWalletAddress(privateKey);
+		if (address) {
+			setAddress(address);
+			const {
+				data: { balance },
+			} = await server.get(`balance/${address}`);
+			setBalance(balance);
+		} else {
+			setBalance(0);
+		}
+	}
 
-  return (
-    <div className="container wallet">
-      <h1>Your Wallet</h1>
+	return (
+		<div className="container wallet">
+			<h1>Your Wallet</h1>
 
-      <label>
-        Wallet Address
-        <input placeholder="Type an address, for example: 0x1" value={address} onChange={onChange}></input>
-      </label>
+			<label>
+				Private Key
+				<input placeholder="Type in a private key" value={privateKey} onChange={onChange}></input>
+			</label>
 
-      <div className="balance">Balance: {balance}</div>
-    </div>
-  );
+			<label>
+				Address
+				<input disabled value={address}></input>
+			</label>
+
+			<div className="balance">Balance: {balance}</div>
+		</div>
+	);
 }
 
 export default Wallet;

@@ -1,54 +1,74 @@
-import { useState } from "react";
-import server from "./server";
+import { useState, useEffect } from 'react';
+import server from './server';
+import { getPublicKey } from './utils';
+import Transaction from './utils/transaction';
 
-function Transfer({ address, setBalance }) {
-  const [sendAmount, setSendAmount] = useState("");
-  const [recipient, setRecipient] = useState("");
+function Transfer({ privateKey, setBalance }) {
+	const [sendAmount, setSendAmount] = useState('');
+	const [recipient, setRecipient] = useState('');
+	const [nonce, setNonce] = useState(0);
 
-  const setValue = (setter) => (evt) => setter(evt.target.value);
+	const setValue = (setter) => (evt) => setter(evt.target.value);
 
-  async function transfer(evt) {
-    evt.preventDefault();
+	useEffect(() => {
+		if (privateKey) {
+			const publicKey = getPublicKey(privateKey);
+			const storedNonce = localStorage.getItem('nonce_' + publicKey);
+			setNonce(storedNonce ? parseInt(storedNonce, 10) : 0);
+		}
+	}, [privateKey]);
 
-    try {
-      const {
-        data: { balance },
-      } = await server.post(`send`, {
-        sender: address,
-        amount: parseInt(sendAmount),
-        recipient,
-      });
-      setBalance(balance);
-    } catch (ex) {
-      alert(ex.response.data.message);
-    }
-  }
+	function saveNonce(updatedNonce) {
+		if (privateKey) {
+			const publicKey = getPublicKey(privateKey);
+			localStorage.setItem('nonce_' + publicKey, updatedNonce.toString());
+		}
+	}
 
-  return (
-    <form className="container transfer" onSubmit={transfer}>
-      <h1>Send Transaction</h1>
+	async function transfer(evt) {
+		evt.preventDefault();
+		const sender = getPublicKey(privateKey);
+		const transaction = new Transaction(sender, recipient, parseInt(sendAmount), nonce);
+		transaction.signTransaction(privateKey);
+		const data = { ...transaction };
 
-      <label>
-        Send Amount
-        <input
-          placeholder="1, 2, 3..."
-          value={sendAmount}
-          onChange={setValue(setSendAmount)}
-        ></input>
-      </label>
+		try {
+			const {
+				data: { balance, nonce },
+			} = await server.post(`send`, data);
+			setBalance(balance);
+			setNonce(nonce);
+			saveNonce(nonce);
+		} catch (ex) {
+			alert(ex.response.data.message);
+		}
+	}
 
-      <label>
-        Recipient
-        <input
-          placeholder="Type an address, for example: 0x2"
-          value={recipient}
-          onChange={setValue(setRecipient)}
-        ></input>
-      </label>
+	return (
+		<form className="container transfer" onSubmit={transfer}>
+			<h1>Send Transaction</h1>
 
-      <input type="submit" className="button" value="Transfer" />
-    </form>
-  );
+			<label>
+				Send Amount
+				<input
+					placeholder="Enter amount to send"
+					value={sendAmount}
+					onChange={setValue(setSendAmount)}
+				></input>
+			</label>
+
+			<label>
+				Recipient
+				<input
+					placeholder="Type recipient address"
+					value={recipient}
+					onChange={setValue(setRecipient)}
+				></input>
+			</label>
+
+			<input type="submit" className="button" value="Transfer" />
+		</form>
+	);
 }
 
 export default Transfer;
